@@ -2,6 +2,8 @@ plugins {
     id 'java'
 }
 
+def runeLiteVersion = 'latest.release'
+
 repositories {
     mavenLocal()
     maven { url = 'https://repo.runelite.net' }
@@ -9,10 +11,13 @@ repositories {
 }
 
 dependencies {
-    compileOnly 'net.runelite:client:1.10.44'
+    compileOnly group: 'net.runelite', name: 'client', version: runeLiteVersion
     compileOnly 'org.projectlombok:lombok:1.18.30'
     annotationProcessor 'org.projectlombok:lombok:1.18.30'
     compileOnly 'org.pf4j:pf4j:3.10.0'
+
+    testImplementation group: 'net.runelite', name: 'client', version: runeLiteVersion
+    testImplementation group: 'net.runelite', name: 'jshell', version: runeLiteVersion
 }
 
 group = 'com.osrs.plugins'
@@ -23,7 +28,14 @@ java {
     targetCompatibility = JavaVersion.VERSION_11
 }
 
-jar {
-    archiveBaseName = 'CoxScoutPlugin'
-    destinationDirectory = file("${System.getProperty('user.home')}/.runelite/sideloaded-plugins")
+test {
+    // The test source is a launcher, not JUnit tests
+    exclude '**/*'
+}
+
+tasks.register('runPlugin', JavaExec) {
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'com.osrs.plugins.coxscout.CoxScoutPluginTest'
+    jvmArgs '-ea'
+    args '--developer-mode'
 }
