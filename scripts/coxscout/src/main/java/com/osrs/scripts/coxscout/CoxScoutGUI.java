@@ -20,6 +20,7 @@ public class CoxScoutGUI extends JFrame {
     private final JLabel lastLayoutLabel;
     private final JLabel currentLayoutLabel;
     private final JLabel matchResultLabel;
+    private final JPanel presetsPanel;
     private final JTextArea logArea;
     private final JButton startButton;
     private boolean started = false;
@@ -39,7 +40,7 @@ public class CoxScoutGUI extends JFrame {
         mainPanel.setBorder(new EmptyBorder(10, 10, 10, 10));
 
         // Preset layouts panel
-        JPanel presetsPanel = new JPanel();
+        presetsPanel = new JPanel();
         presetsPanel.setLayout(new BoxLayout(presetsPanel, BoxLayout.Y_AXIS));
         presetsPanel.setBorder(new TitledBorder("Desired Layouts"));
 
@@ -142,11 +143,13 @@ public class CoxScoutGUI extends JFrame {
         layoutManager.addCustomSequence(text);
 
         if (!checkboxes.containsKey(text)) {
-            // Add checkbox dynamically
             JCheckBox cb = new JCheckBox(text + "  —  Custom", true);
             cb.addActionListener(e -> layoutManager.setEnabled(text, cb.isSelected()));
             checkboxes.put(text, cb);
-            // Can't easily add to presets panel after construction, show message
+            presetsPanel.add(cb);
+            presetsPanel.revalidate();
+            presetsPanel.repaint();
+            pack();
             appendLog("Added custom layout: " + text);
         }
 
