@@ -1,7 +1,3 @@
-plugins {
-    id 'java'
-}
-
 allprojects {
     group = 'com.osrs'
     version = '1.0.0'
@@ -11,13 +7,16 @@ allprojects {
     }
 }
 
-subprojects {
+// Only apply Java plugin to leaf projects that have source code
+configure(subprojects.findAll { it.name != 'scripts' }) {
     apply plugin: 'java'
 
-    sourceCompatibility = JavaVersion.VERSION_11
-    targetCompatibility = JavaVersion.VERSION_11
+    java {
+        sourceCompatibility = JavaVersion.VERSION_11
+        targetCompatibility = JavaVersion.VERSION_11
+    }
 
     dependencies {
-        compileOnly files("${System.getProperty('user.home')}/DreamBot/BotData/client.jar")
+        compileOnly fileTree(dir: "${System.getProperty('user.home')}/DreamBot/BotData/repository2", include: '*.jar')
     }
 }

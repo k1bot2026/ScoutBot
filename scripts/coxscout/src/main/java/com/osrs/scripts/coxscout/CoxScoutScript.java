@@ -93,7 +93,7 @@ public class CoxScoutScript extends AbstractScript implements ChatListener {
 
         // Left-click at the locked mouse position (already on Steps)
         // Mouse does NOT move — we click exactly where it is
-        Mouse.click(mouseX, mouseY, false);
+        Mouse.click(new Point(mouseX, mouseY));
         log("Clicked Steps at (" + mouseX + ", " + mouseY + ") — attempt #" + (attempts + 1));
         setState(ScoutState.SKIP_DIALOG);
         return Calculations.random(600, 1000);
