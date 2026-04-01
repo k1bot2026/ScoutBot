@@ -1,0 +1,4 @@
+jar {
+    destinationDirectory = file("${System.getProperty('user.home')}/DreamBot/Scripts")
+    archiveBaseName = 'CoxScout'
+}
