@@ -8,8 +8,7 @@ import org.dreambot.api.input.event.impl.keyboard.awt.Key;
 import org.dreambot.api.script.AbstractScript;
 import org.dreambot.api.script.Category;
 import org.dreambot.api.script.ScriptManifest;
-import org.dreambot.api.script.listener.MenuRowListener;
-import org.dreambot.api.wrappers.widgets.MenuRow;
+import org.dreambot.api.wrappers.widgets.Menu;
 
 import java.awt.*;
 
@@ -17,10 +16,10 @@ import java.awt.*;
     name = "COX Scout",
     description = "Scouts Chambers of Xeric layouts by reloading the raid entrance.",
     author = "OSRS Bot",
-    version = 2.2,
+    version = 2.3,
     category = Category.MINIGAME
 )
-public class CoxScoutScript extends AbstractScript implements MenuRowListener {
+public class CoxScoutScript extends AbstractScript {
 
     private static final long DIALOG_TIMEOUT = 5000;
     private static final long LAYOUT_DETECT_TIMEOUT = 5000;
@@ -33,9 +32,6 @@ public class CoxScoutScript extends AbstractScript implements MenuRowListener {
     private String matchedLayout = "";
     private int attempts = 0;
     private long stateStartTime = 0;
-
-    // Flag to track if we swapped the menu entry this cycle
-    private boolean menuSwapped = false;
 
     @Override
     public void onStart() {
@@ -60,34 +56,10 @@ public class CoxScoutScript extends AbstractScript implements MenuRowListener {
             return;
         }
 
-        log("COX Scout v2.2 started. Menu entry swap active — left-click = Reload.");
+        log("COX Scout v2.3 started.");
         log("Position your mouse on the Steps. Mouse will NOT move.");
         log("Scouting for " + layoutManager.getEnabledSequences().size() + " layouts: " + layoutManager.getEnabledSequences());
         stateStartTime = System.currentTimeMillis();
-    }
-
-    /**
-     * MenuRowListener callback — fires when a menu entry is being added.
-     * If we see "Reload" on "Steps", swap it to be the top/left-click action
-     * by changing its opCode to match the default action slot.
-     */
-    @Override
-    public void onRowAdded(MenuRow row) {
-        if (row == null) return;
-
-        // Only swap when we're in CLICK_STEPS state (actively scouting)
-        if (state != ScoutState.CLICK_STEPS) return;
-
-        String action = row.getAction();
-        String object = row.getObject();
-
-        // Swap "Reload" on "Steps" to be the default left-click action
-        if (action != null && object != null
-                && action.equals("Reload") && object.contains("Steps")) {
-            // Set opCode to 1 which is the "first option" / left-click action
-            row.setOpCode(1);
-            menuSwapped = true;
-        }
     }
 
     @Override
@@ -111,23 +83,33 @@ public class CoxScoutScript extends AbstractScript implements MenuRowListener {
     }
 
     /**
-     * Left-click at current mouse position.
-     * MenuRowListener swaps "Reload" to be the default action,
-     * so a simple left-click triggers Reload on the Steps.
-     * Mouse does NOT move.
+     * Right-click in place to open context menu, then select "Reload".
+     * Mouse does NOT move — both actions happen at current cursor position.
      */
     private int handleClickSteps() {
         lastDetectedLayout = "";
         guiState("RELOADING");
-        menuSwapped = false;
 
-        // Just left-click in place — the MenuRowListener makes "Reload" the default action
-        Mouse.click();
-        attempts++;
-        log("[RELOAD] Left-click in place — attempt #" + attempts);
-        guiLog("Attempt #" + attempts + " — Reloading raid...");
-        setState(ScoutState.SKIP_DIALOG);
-        return Calculations.random(600, 1000);
+        // Right-click at current mouse position (true = right-click)
+        Mouse.click(true);
+        sleep(Calculations.random(100, 200));
+
+        // Select "Reload" from the context menu
+        if (Menu.isVisible() && Menu.contains("Reload")) {
+            Menu.clickAction("Reload");
+            attempts++;
+            log("[RELOAD] Right-click + Reload — attempt #" + attempts);
+            guiLog("Attempt #" + attempts + " — Reloading raid...");
+            setState(ScoutState.SKIP_DIALOG);
+            return Calculations.random(600, 1000);
+        }
+
+        // Menu didn't open or Reload not found — close menu and retry
+        if (Menu.isVisible()) {
+            Menu.close();
+        }
+        log("[RELOAD] Reload not found in menu, retrying...");
+        return Calculations.random(500, 1000);
     }
 
     /**
