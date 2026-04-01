@@ -9,6 +9,9 @@ import org.dreambot.api.script.AbstractScript;
 import org.dreambot.api.script.Category;
 import org.dreambot.api.script.ScriptManifest;
 import org.dreambot.api.wrappers.interactive.GameObject;
+import org.dreambot.api.wrappers.widgets.Menu;
+import org.dreambot.api.wrappers.widgets.MenuRow;
+import org.dreambot.api.wrappers.widgets.builder.MenuRowBuilder;
 
 import java.awt.*;
 
@@ -82,22 +85,38 @@ public class CoxScoutScript extends AbstractScript {
     }
 
     /**
-     * Right-click Steps and select "Reload" to get a new raid layout.
+     * Inject "Reload" action on Steps directly — no mouse movement, no right-click menu.
+     * Works like RuneLite's Menu Entry Swapper: sends the action packet directly.
      */
     private int handleClickSteps() {
         lastDetectedLayout = "";
         guiState("RELOADING");
 
         GameObject steps = GameObjects.closest("Steps");
-        if (steps != null && steps.interact("Reload")) {
-            attempts++;
-            log("[RELOAD] Attempt #" + attempts);
-            guiLog("Attempt #" + attempts + " — Reloading raid...");
-            setState(ScoutState.SKIP_DIALOG);
-            return Calculations.random(600, 1000);
+        if (steps != null) {
+            // Build a MenuRow for "Reload" on the Steps object and inject it directly
+            // This sends the action without moving the mouse or opening the menu
+            MenuRow reloadAction = MenuRowBuilder.buildFromObject(steps, "Reload");
+            if (reloadAction != null && Menu.inject(reloadAction)) {
+                attempts++;
+                log("[RELOAD] Injected Reload action — attempt #" + attempts);
+                guiLog("Attempt #" + attempts + " — Reloading raid (menu inject)...");
+                setState(ScoutState.SKIP_DIALOG);
+                return Calculations.random(600, 1000);
+            }
+
+            // Fallback: regular interact if injection fails
+            log("[RELOAD] Menu inject failed, falling back to regular interact...");
+            if (steps.interact("Reload")) {
+                attempts++;
+                log("[RELOAD] Fallback interact — attempt #" + attempts);
+                guiLog("Attempt #" + attempts + " — Reloading raid (fallback)...");
+                setState(ScoutState.SKIP_DIALOG);
+                return Calculations.random(600, 1000);
+            }
         }
 
-        log("[RELOAD] Steps not found or Reload failed, retrying...");
+        log("[RELOAD] Steps not found, retrying...");
         guiLog("Steps not found, retrying...");
         return Calculations.random(1000, 2000);
     }
