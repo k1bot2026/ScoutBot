@@ -1,0 +1,29 @@
+plugins {
+    id 'java'
+}
+
+repositories {
+    mavenLocal()
+    maven { url = 'https://repo.runelite.net' }
+    mavenCentral()
+}
+
+dependencies {
+    compileOnly 'net.runelite:client:1.10.44'
+    compileOnly 'org.projectlombok:lombok:1.18.30'
+    annotationProcessor 'org.projectlombok:lombok:1.18.30'
+    compileOnly 'org.pf4j:pf4j:3.10.0'
+}
+
+group = 'com.osrs.plugins'
+version = '1.0.0'
+
+java {
+    sourceCompatibility = JavaVersion.VERSION_11
+    targetCompatibility = JavaVersion.VERSION_11
+}
+
+jar {
+    archiveBaseName = 'CoxScoutPlugin'
+    destinationDirectory = file("${System.getProperty('user.home')}/.runelite/sideloaded-plugins")
+}

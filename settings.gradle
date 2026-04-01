@@ -1,3 +1,4 @@
 rootProject.name = 'osrs-bots'
 
 include 'scripts:coxscout'
+include 'plugins:coxscout'

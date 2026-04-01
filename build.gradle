@@ -8,7 +8,7 @@ allprojects {
 }
 
 // Only apply Java plugin to leaf projects that have source code
-configure(subprojects.findAll { it.name != 'scripts' }) {
+configure(subprojects.findAll { !['scripts', 'plugins'].contains(it.name) && it.parent?.name != 'plugins' }) {
     apply plugin: 'java'
 
     java {
