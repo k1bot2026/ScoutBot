@@ -48,6 +48,13 @@ public class CoxScoutGUI extends JFrame {
         mainPanel.add(presetsPanel);
         mainPanel.add(Box.createVerticalStrut(10));
 
+        // Instruction label
+        JLabel instructionLabel = new JLabel("<html><b>Important:</b> Position your mouse on the Steps before starting.<br>The mouse will NOT move during scouting.</html>");
+        instructionLabel.setForeground(Color.RED.darker());
+        instructionLabel.setBorder(new EmptyBorder(0, 5, 0, 5));
+        mainPanel.add(instructionLabel);
+        mainPanel.add(Box.createVerticalStrut(10));
+
         // Custom layout input
         JPanel customPanel = new JPanel(new BorderLayout(5, 0));
         customPanel.setBorder(new TitledBorder("Add Custom Layout"));

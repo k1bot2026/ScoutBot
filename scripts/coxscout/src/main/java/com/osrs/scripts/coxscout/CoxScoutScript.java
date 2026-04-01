@@ -2,14 +2,13 @@ package com.osrs.scripts.coxscout;
 
 import org.dreambot.api.methods.Calculations;
 import org.dreambot.api.methods.dialogues.Dialogues;
-import org.dreambot.api.methods.interactive.GameObjects;
+import org.dreambot.api.input.Mouse;
 import org.dreambot.api.input.Keyboard;
 import org.dreambot.api.input.event.impl.keyboard.awt.Key;
 import org.dreambot.api.script.AbstractScript;
 import org.dreambot.api.script.Category;
 import org.dreambot.api.script.ScriptManifest;
 import org.dreambot.api.script.listener.ChatListener;
-import org.dreambot.api.wrappers.interactive.GameObject;
 import org.dreambot.api.wrappers.widgets.message.Message;
 
 import java.awt.*;
@@ -26,7 +25,6 @@ import java.util.regex.Pattern;
 public class CoxScoutScript extends AbstractScript implements ChatListener {
 
     private static final Pattern LAYOUT_PATTERN = Pattern.compile("([SCPFMVT]{8,12})");
-    private static final String STEPS_NAME = "Steps";
     private static final long DIALOG_TIMEOUT = 5000;
     private static final long CHAT_READ_TIMEOUT = 3000;
 
@@ -39,6 +37,10 @@ public class CoxScoutScript extends AbstractScript implements ChatListener {
     private int attempts = 0;
     private long stateStartTime = 0;
     private boolean layoutDetectedThisCycle = false;
+
+    // Mouse position is locked — player must position mouse on Steps before starting
+    private int mouseX;
+    private int mouseY;
 
     @Override
     public void onStart() {
@@ -55,7 +57,12 @@ public class CoxScoutScript extends AbstractScript implements ChatListener {
             return;
         }
 
-        log("COX Scout started. Scouting for " + layoutManager.getEnabledSequences().size() + " layouts.");
+        // Capture current mouse position — player must have mouse on Steps before starting
+        mouseX = Mouse.getX();
+        mouseY = Mouse.getY();
+
+        log("COX Scout started. Mouse locked at (" + mouseX + ", " + mouseY + ")");
+        log("Scouting for " + layoutManager.getEnabledSequences().size() + " layouts.");
         log("Desired layouts: " + layoutManager.getEnabledSequences());
         stateStartTime = System.currentTimeMillis();
     }
@@ -84,15 +91,12 @@ public class CoxScoutScript extends AbstractScript implements ChatListener {
         layoutDetectedThisCycle = false;
         lastDetectedLayout = "";
 
-        GameObject steps = GameObjects.closest(STEPS_NAME);
-        if (steps != null && steps.interact()) {
-            log("Clicked Steps (attempt #" + (attempts + 1) + ")");
-            setState(ScoutState.SKIP_DIALOG);
-            return Calculations.random(600, 1000);
-        }
-
-        log("Steps not found, retrying...");
-        return Calculations.random(1000, 2000);
+        // Left-click at the locked mouse position (already on Steps)
+        // Mouse does NOT move — we click exactly where it is
+        Mouse.click(mouseX, mouseY, false);
+        log("Clicked Steps at (" + mouseX + ", " + mouseY + ") — attempt #" + (attempts + 1));
+        setState(ScoutState.SKIP_DIALOG);
+        return Calculations.random(600, 1000);
     }
 
     private int handleSkipDialog() {
