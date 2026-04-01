@@ -2,13 +2,13 @@ package com.osrs.scripts.coxscout;
 
 import org.dreambot.api.methods.Calculations;
 import org.dreambot.api.methods.dialogues.Dialogues;
-import org.dreambot.api.input.Mouse;
+import org.dreambot.api.methods.interactive.GameObjects;
 import org.dreambot.api.input.Keyboard;
 import org.dreambot.api.input.event.impl.keyboard.awt.Key;
 import org.dreambot.api.script.AbstractScript;
 import org.dreambot.api.script.Category;
 import org.dreambot.api.script.ScriptManifest;
-import org.dreambot.api.wrappers.widgets.Menu;
+import org.dreambot.api.wrappers.interactive.GameObject;
 
 import java.awt.*;
 
@@ -16,13 +16,13 @@ import java.awt.*;
     name = "COX Scout",
     description = "Scouts Chambers of Xeric layouts by reloading the raid entrance.",
     author = "OSRS Bot",
-    version = 2.3,
+    version = 2.1,
     category = Category.MINIGAME
 )
 public class CoxScoutScript extends AbstractScript {
 
     private static final long DIALOG_TIMEOUT = 5000;
-    private static final long LAYOUT_DETECT_TIMEOUT = 5000;
+    private static final long LAYOUT_DETECT_TIMEOUT = 5000; // Increased to 5s for chunk loading
 
     private ScoutState state = ScoutState.CLICK_STEPS;
     private LayoutManager layoutManager;
@@ -56,8 +56,7 @@ public class CoxScoutScript extends AbstractScript {
             return;
         }
 
-        log("COX Scout v2.3 started.");
-        log("Position your mouse on the Steps. Mouse will NOT move.");
+        log("COX Scout v2.1 started.");
         log("Scouting for " + layoutManager.getEnabledSequences().size() + " layouts: " + layoutManager.getEnabledSequences());
         stateStartTime = System.currentTimeMillis();
     }
@@ -83,33 +82,24 @@ public class CoxScoutScript extends AbstractScript {
     }
 
     /**
-     * Right-click in place to open context menu, then select "Reload".
-     * Mouse does NOT move — both actions happen at current cursor position.
+     * Right-click Steps and select "Reload" to get a new raid layout.
      */
     private int handleClickSteps() {
         lastDetectedLayout = "";
         guiState("RELOADING");
 
-        // Right-click at current mouse position (true = right-click)
-        Mouse.click(true);
-        sleep(Calculations.random(100, 200));
-
-        // Select "Reload" from the context menu
-        if (Menu.isVisible() && Menu.contains("Reload")) {
-            Menu.clickAction("Reload");
+        GameObject steps = GameObjects.closest("Steps");
+        if (steps != null && steps.interact("Reload")) {
             attempts++;
-            log("[RELOAD] Right-click + Reload — attempt #" + attempts);
+            log("[RELOAD] Attempt #" + attempts);
             guiLog("Attempt #" + attempts + " — Reloading raid...");
             setState(ScoutState.SKIP_DIALOG);
             return Calculations.random(600, 1000);
         }
 
-        // Menu didn't open or Reload not found — close menu and retry
-        if (Menu.isVisible()) {
-            Menu.close();
-        }
-        log("[RELOAD] Reload not found in menu, retrying...");
-        return Calculations.random(500, 1000);
+        log("[RELOAD] Steps not found or Reload failed, retrying...");
+        guiLog("Steps not found, retrying...");
+        return Calculations.random(1000, 2000);
     }
 
     /**
