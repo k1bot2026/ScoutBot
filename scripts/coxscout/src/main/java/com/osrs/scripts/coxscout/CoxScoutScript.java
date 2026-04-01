@@ -16,13 +16,13 @@ import java.awt.*;
     name = "COX Scout",
     description = "Scouts Chambers of Xeric layouts by reloading the raid entrance.",
     author = "OSRS Bot",
-    version = 2.0,
+    version = 2.1,
     category = Category.MINIGAME
 )
 public class CoxScoutScript extends AbstractScript {
 
     private static final long DIALOG_TIMEOUT = 5000;
-    private static final long LAYOUT_DETECT_TIMEOUT = 3000;
+    private static final long LAYOUT_DETECT_TIMEOUT = 5000; // Increased to 5s for chunk loading
 
     private ScoutState state = ScoutState.CLICK_STEPS;
     private LayoutManager layoutManager;
@@ -56,8 +56,7 @@ public class CoxScoutScript extends AbstractScript {
             return;
         }
 
-        log("COX Scout v2.0 started — detecting layouts from game state (no RuneLite needed).");
-        log("Using right-click 'Reload' on Steps — no manual mouse positioning needed.");
+        log("COX Scout v2.1 started.");
         log("Scouting for " + layoutManager.getEnabledSequences().size() + " layouts: " + layoutManager.getEnabledSequences());
         stateStartTime = System.currentTimeMillis();
     }
@@ -83,20 +82,23 @@ public class CoxScoutScript extends AbstractScript {
     }
 
     /**
-     * Left-click at current mouse position (no movement).
+     * Right-click Steps and select "Reload" to get a new raid layout.
      */
     private int handleClickSteps() {
         lastDetectedLayout = "";
+        guiState("RELOADING");
 
-        // Right-click Steps and select "Reload" to get a new raid layout
         GameObject steps = GameObjects.closest("Steps");
         if (steps != null && steps.interact("Reload")) {
-            log("[CLICK_STEPS] Reload on Steps — attempt #" + (attempts + 1));
+            attempts++;
+            log("[RELOAD] Attempt #" + attempts);
+            guiLog("Attempt #" + attempts + " — Reloading raid...");
             setState(ScoutState.SKIP_DIALOG);
             return Calculations.random(600, 1000);
         }
 
-        log("[CLICK_STEPS] Steps not found or Reload failed, retrying...");
+        log("[RELOAD] Steps not found or Reload failed, retrying...");
+        guiLog("Steps not found, retrying...");
         return Calculations.random(1000, 2000);
     }
 
@@ -105,15 +107,15 @@ public class CoxScoutScript extends AbstractScript {
      */
     private int handleSkipDialog() {
         if (Dialogues.inDialogue()) {
-            log("[SKIP_DIALOG] In dialogue, pressing 1...");
             Keyboard.typeKey(Key.ONE);
             return Calculations.random(300, 600);
         }
 
         long elapsed = System.currentTimeMillis() - stateStartTime;
         if (elapsed > DIALOG_TIMEOUT) {
-            log("[SKIP_DIALOG] Timeout after " + elapsed + "ms, detecting layout...");
-            setState(ScoutState.READ_CHAT); // Reusing READ_CHAT state for layout detection
+            guiState("DETECTING");
+            guiLog("Dialog done. Scanning layout...");
+            setState(ScoutState.READ_CHAT);
             return Calculations.random(200, 400);
         }
 
@@ -121,18 +123,17 @@ public class CoxScoutScript extends AbstractScript {
     }
 
     /**
-     * Detect layout from instance template chunks (replaces chat reading).
+     * Detect layout from instance template chunks.
      */
     private int handleDetectLayout() {
         String layout = RaidLayoutDetector.detectLayout();
 
         if (!layout.isEmpty() && layout.length() >= 4) {
             lastDetectedLayout = layout;
-            log("[DETECT] Layout detected from game state: " + layout);
+            log("[DETECT] Layout: " + layout);
 
-            // Log detailed info on first attempt for debugging
-            if (attempts == 0) {
-                log(RaidLayoutDetector.detectDetailedLayout());
+            if (gui != null) {
+                gui.onLayoutDetected(layout, attempts);
             }
 
             setState(ScoutState.MATCH_LAYOUT);
@@ -141,10 +142,12 @@ public class CoxScoutScript extends AbstractScript {
 
         long elapsed = System.currentTimeMillis() - stateStartTime;
         if (elapsed > LAYOUT_DETECT_TIMEOUT) {
-            log("[DETECT] No layout detected after " + elapsed + "ms, retrying...");
-
-            // Log detailed chunk data for debugging
+            log("[DETECT] No layout detected after " + elapsed + "ms");
             log(RaidLayoutDetector.detectDetailedLayout());
+
+            if (gui != null) {
+                gui.onDetectionFailed(attempts);
+            }
 
             setState(ScoutState.CLICK_STEPS);
             return Calculations.random(500, 1000);
@@ -157,31 +160,45 @@ public class CoxScoutScript extends AbstractScript {
      * Check if detected layout matches any desired sequence.
      */
     private int handleMatchLayout() {
-        attempts++;
-
         if (layoutManager.matches(lastDetectedLayout)) {
             matchedLayout = lastDetectedLayout;
             log("*** MATCH FOUND: " + matchedLayout + " after " + attempts + " attempts! ***");
             Toolkit.getDefaultToolkit().beep();
+
             if (gui != null) {
                 gui.onLayoutFound(matchedLayout, attempts);
             }
+
             state = ScoutState.FOUND;
+            guiState("FOUND");
             return -1;
         }
 
-        log("[MATCH] " + lastDetectedLayout + " — no match. (" + attempts + " attempts)");
+        log("[NO MATCH] " + lastDetectedLayout + " (" + attempts + " attempts)");
+
         if (gui != null) {
-            gui.updateStatus(attempts, lastDetectedLayout);
+            gui.onLayoutNoMatch(lastDetectedLayout, attempts);
         }
+
         setState(ScoutState.CLICK_STEPS);
         return Calculations.random(300, 700);
     }
 
     private void setState(ScoutState newState) {
-        log("[STATE] " + state + " -> " + newState);
         this.state = newState;
         this.stateStartTime = System.currentTimeMillis();
+    }
+
+    private void guiState(String stateName) {
+        if (gui != null) {
+            gui.updateState(stateName);
+        }
+    }
+
+    private void guiLog(String message) {
+        if (gui != null) {
+            gui.appendLog(message);
+        }
     }
 
     @Override
@@ -190,9 +207,4 @@ public class CoxScoutScript extends AbstractScript {
             gui.dispose();
         }
     }
-
-    public ScoutState getState() { return state; }
-    public int getAttempts() { return attempts; }
-    public String getLastDetectedLayout() { return lastDetectedLayout; }
-    public String getMatchedLayout() { return matchedLayout; }
 }
