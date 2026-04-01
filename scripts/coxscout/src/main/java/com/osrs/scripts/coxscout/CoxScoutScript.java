@@ -2,16 +2,14 @@ package com.osrs.scripts.coxscout;
 
 import org.dreambot.api.methods.Calculations;
 import org.dreambot.api.methods.dialogues.Dialogues;
-import org.dreambot.api.methods.interactive.GameObjects;
+import org.dreambot.api.input.Mouse;
 import org.dreambot.api.input.Keyboard;
 import org.dreambot.api.input.event.impl.keyboard.awt.Key;
 import org.dreambot.api.script.AbstractScript;
 import org.dreambot.api.script.Category;
 import org.dreambot.api.script.ScriptManifest;
-import org.dreambot.api.wrappers.interactive.GameObject;
-import org.dreambot.api.wrappers.widgets.Menu;
+import org.dreambot.api.script.listener.MenuRowListener;
 import org.dreambot.api.wrappers.widgets.MenuRow;
-import org.dreambot.api.wrappers.widgets.builder.MenuRowBuilder;
 
 import java.awt.*;
 
@@ -19,13 +17,13 @@ import java.awt.*;
     name = "COX Scout",
     description = "Scouts Chambers of Xeric layouts by reloading the raid entrance.",
     author = "OSRS Bot",
-    version = 2.1,
+    version = 2.2,
     category = Category.MINIGAME
 )
-public class CoxScoutScript extends AbstractScript {
+public class CoxScoutScript extends AbstractScript implements MenuRowListener {
 
     private static final long DIALOG_TIMEOUT = 5000;
-    private static final long LAYOUT_DETECT_TIMEOUT = 5000; // Increased to 5s for chunk loading
+    private static final long LAYOUT_DETECT_TIMEOUT = 5000;
 
     private ScoutState state = ScoutState.CLICK_STEPS;
     private LayoutManager layoutManager;
@@ -35,6 +33,9 @@ public class CoxScoutScript extends AbstractScript {
     private String matchedLayout = "";
     private int attempts = 0;
     private long stateStartTime = 0;
+
+    // Flag to track if we swapped the menu entry this cycle
+    private boolean menuSwapped = false;
 
     @Override
     public void onStart() {
@@ -59,9 +60,34 @@ public class CoxScoutScript extends AbstractScript {
             return;
         }
 
-        log("COX Scout v2.1 started.");
+        log("COX Scout v2.2 started. Menu entry swap active — left-click = Reload.");
+        log("Position your mouse on the Steps. Mouse will NOT move.");
         log("Scouting for " + layoutManager.getEnabledSequences().size() + " layouts: " + layoutManager.getEnabledSequences());
         stateStartTime = System.currentTimeMillis();
+    }
+
+    /**
+     * MenuRowListener callback — fires when a menu entry is being added.
+     * If we see "Reload" on "Steps", swap it to be the top/left-click action
+     * by changing its opCode to match the default action slot.
+     */
+    @Override
+    public void onRowAdded(MenuRow row) {
+        if (row == null) return;
+
+        // Only swap when we're in CLICK_STEPS state (actively scouting)
+        if (state != ScoutState.CLICK_STEPS) return;
+
+        String action = row.getAction();
+        String object = row.getObject();
+
+        // Swap "Reload" on "Steps" to be the default left-click action
+        if (action != null && object != null
+                && action.equals("Reload") && object.contains("Steps")) {
+            // Set opCode to 1 which is the "first option" / left-click action
+            row.setOpCode(1);
+            menuSwapped = true;
+        }
     }
 
     @Override
@@ -85,40 +111,23 @@ public class CoxScoutScript extends AbstractScript {
     }
 
     /**
-     * Inject "Reload" action on Steps directly — no mouse movement, no right-click menu.
-     * Works like RuneLite's Menu Entry Swapper: sends the action packet directly.
+     * Left-click at current mouse position.
+     * MenuRowListener swaps "Reload" to be the default action,
+     * so a simple left-click triggers Reload on the Steps.
+     * Mouse does NOT move.
      */
     private int handleClickSteps() {
         lastDetectedLayout = "";
         guiState("RELOADING");
+        menuSwapped = false;
 
-        GameObject steps = GameObjects.closest("Steps");
-        if (steps != null) {
-            // Build a MenuRow for "Reload" on the Steps object and inject it directly
-            // This sends the action without moving the mouse or opening the menu
-            MenuRow reloadAction = MenuRowBuilder.buildFromObject(steps, "Reload");
-            if (reloadAction != null && Menu.inject(reloadAction)) {
-                attempts++;
-                log("[RELOAD] Injected Reload action — attempt #" + attempts);
-                guiLog("Attempt #" + attempts + " — Reloading raid (menu inject)...");
-                setState(ScoutState.SKIP_DIALOG);
-                return Calculations.random(600, 1000);
-            }
-
-            // Fallback: regular interact if injection fails
-            log("[RELOAD] Menu inject failed, falling back to regular interact...");
-            if (steps.interact("Reload")) {
-                attempts++;
-                log("[RELOAD] Fallback interact — attempt #" + attempts);
-                guiLog("Attempt #" + attempts + " — Reloading raid (fallback)...");
-                setState(ScoutState.SKIP_DIALOG);
-                return Calculations.random(600, 1000);
-            }
-        }
-
-        log("[RELOAD] Steps not found, retrying...");
-        guiLog("Steps not found, retrying...");
-        return Calculations.random(1000, 2000);
+        // Just left-click in place — the MenuRowListener makes "Reload" the default action
+        Mouse.click();
+        attempts++;
+        log("[RELOAD] Left-click in place — attempt #" + attempts);
+        guiLog("Attempt #" + attempts + " — Reloading raid...");
+        setState(ScoutState.SKIP_DIALOG);
+        return Calculations.random(600, 1000);
     }
 
     /**
