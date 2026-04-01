@@ -9,10 +9,17 @@ public class LayoutManager {
 
     private static final Map<String, String> PRESETS = new LinkedHashMap<>();
     static {
-        PRESETS.put("No Vespula/Vasa (3c2p)", "SCPFCCSPSF");
-        PRESETS.put("Tekton Skip (3c2p)", "SCFPCCSPSF");
-        PRESETS.put("Crabs + Rope (3c2p)", "CSPFCCSPSF");
-        PRESETS.put("Fast Scout (2c2p)", "SCPFCCSPF");
+        // VTV rotation (Vasa > Tekton > Tightrope > Vespula > Crabs)
+        PRESETS.put("VTV — FSCCSPCPSF", "FSCCSPCPSF");
+        PRESETS.put("VTV — SFCCSPCPSF", "SFCCSPCPSF");
+        PRESETS.put("VTV — SCPFCCSPSF", "SCPFCCSPSF");
+        PRESETS.put("VTV — SCSPFCCSPF", "SCSPFCCSPF");
+
+        // VSV rotation (Vasa > Shamans > Tightrope > Vespula > Crabs)
+        PRESETS.put("VSV — SCSPFCCSPF", "SCSPFCCSPF");
+        PRESETS.put("VSV — SCPFCCSPSF", "SCPFCCSPSF");
+        PRESETS.put("VSV — SFCCSPCPSF", "SFCCSPCPSF");
+        PRESETS.put("VSV — FSCCSPCPSF", "FSCCSPCPSF");
     }
 
     private final Map<String, Boolean> sequences = new LinkedHashMap<>();

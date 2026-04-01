@@ -117,6 +117,38 @@ public class RaidLayoutDetector {
     }
 
     /**
+     * Detect layout and return a formatted string with room names.
+     * Example: "[SCPFCCSPSF] Vasa > Tightrope > Tekton > Vespula > Crabs"
+     * Only shows combat and puzzle rooms (skips Scavengers/Farming).
+     */
+    public static String detectLayoutWithNames() {
+        List<RoomInfo> rooms = scanRooms();
+        if (rooms.isEmpty()) {
+            return "";
+        }
+
+        StringBuilder code = new StringBuilder();
+        StringBuilder names = new StringBuilder();
+
+        for (RoomInfo room : rooms) {
+            code.append(room.type);
+        }
+
+        boolean first = true;
+        for (RoomInfo room : rooms) {
+            if (room.type == COMBAT || room.type == PUZZLE) {
+                if (!first) {
+                    names.append(" > ");
+                }
+                names.append(room.name);
+                first = false;
+            }
+        }
+
+        return "[" + code + "] " + names;
+    }
+
+    /**
      * Get a detailed description of all detected rooms for logging/debugging.
      * Includes chunk positions, template coordinates, and room names.
      */

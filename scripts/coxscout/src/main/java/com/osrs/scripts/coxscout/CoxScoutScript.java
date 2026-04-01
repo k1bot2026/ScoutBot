@@ -127,13 +127,14 @@ public class CoxScoutScript extends AbstractScript {
      */
     private int handleDetectLayout() {
         String layout = RaidLayoutDetector.detectLayout();
+        String layoutWithNames = RaidLayoutDetector.detectLayoutWithNames();
 
         if (!layout.isEmpty() && layout.length() >= 4) {
             lastDetectedLayout = layout;
-            log("[DETECT] Layout: " + layout);
+            log("[DETECT] " + layoutWithNames);
 
             if (gui != null) {
-                gui.onLayoutDetected(layout, attempts);
+                gui.onLayoutDetected(layoutWithNames, attempts);
             }
 
             setState(ScoutState.MATCH_LAYOUT);
@@ -160,13 +161,15 @@ public class CoxScoutScript extends AbstractScript {
      * Check if detected layout matches any desired sequence.
      */
     private int handleMatchLayout() {
+        String layoutWithNames = RaidLayoutDetector.detectLayoutWithNames();
+
         if (layoutManager.matches(lastDetectedLayout)) {
             matchedLayout = lastDetectedLayout;
-            log("*** MATCH FOUND: " + matchedLayout + " after " + attempts + " attempts! ***");
+            log("*** MATCH FOUND: " + layoutWithNames + " after " + attempts + " attempts! ***");
             Toolkit.getDefaultToolkit().beep();
 
             if (gui != null) {
-                gui.onLayoutFound(matchedLayout, attempts);
+                gui.onLayoutFound(layoutWithNames, attempts);
             }
 
             state = ScoutState.FOUND;
@@ -174,10 +177,10 @@ public class CoxScoutScript extends AbstractScript {
             return -1;
         }
 
-        log("[NO MATCH] " + lastDetectedLayout + " (" + attempts + " attempts)");
+        log("[NO MATCH] " + layoutWithNames + " (" + attempts + " attempts)");
 
         if (gui != null) {
-            gui.onLayoutNoMatch(lastDetectedLayout, attempts);
+            gui.onLayoutNoMatch(layoutWithNames, attempts);
         }
 
         setState(ScoutState.CLICK_STEPS);
