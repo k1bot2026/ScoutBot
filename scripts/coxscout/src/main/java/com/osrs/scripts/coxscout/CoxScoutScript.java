@@ -8,25 +8,20 @@ import org.dreambot.api.input.event.impl.keyboard.awt.Key;
 import org.dreambot.api.script.AbstractScript;
 import org.dreambot.api.script.Category;
 import org.dreambot.api.script.ScriptManifest;
-import org.dreambot.api.script.listener.ChatListener;
-import org.dreambot.api.wrappers.widgets.message.Message;
 
 import java.awt.*;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 @ScriptManifest(
     name = "COX Scout",
     description = "Scouts Chambers of Xeric layouts by reloading the raid entrance.",
     author = "OSRS Bot",
-    version = 1.0,
+    version = 2.0,
     category = Category.MINIGAME
 )
-public class CoxScoutScript extends AbstractScript implements ChatListener {
+public class CoxScoutScript extends AbstractScript {
 
-    private static final Pattern LAYOUT_PATTERN = Pattern.compile("([SCPFMVT]{8,12})");
     private static final long DIALOG_TIMEOUT = 5000;
-    private static final long CHAT_READ_TIMEOUT = 3000;
+    private static final long LAYOUT_DETECT_TIMEOUT = 3000;
 
     private ScoutState state = ScoutState.CLICK_STEPS;
     private LayoutManager layoutManager;
@@ -36,11 +31,6 @@ public class CoxScoutScript extends AbstractScript implements ChatListener {
     private String matchedLayout = "";
     private int attempts = 0;
     private long stateStartTime = 0;
-    private boolean layoutDetectedThisCycle = false;
-
-    // Mouse position is locked — player must position mouse on Steps before starting
-    private int mouseX;
-    private int mouseY;
 
     @Override
     public void onStart() {
@@ -57,13 +47,9 @@ public class CoxScoutScript extends AbstractScript implements ChatListener {
             return;
         }
 
-        // Capture current mouse position — player must have mouse on Steps before starting
-        mouseX = Mouse.getX();
-        mouseY = Mouse.getY();
-
-        log("COX Scout started. Mouse locked at (" + mouseX + ", " + mouseY + ")");
-        log("Scouting for " + layoutManager.getEnabledSequences().size() + " layouts.");
-        log("Desired layouts: " + layoutManager.getEnabledSequences());
+        log("COX Scout v2.0 started — detecting layouts from game state (no RuneLite needed).");
+        log("Mouse at (" + Mouse.getX() + ", " + Mouse.getY() + ") — will click in place.");
+        log("Scouting for " + layoutManager.getEnabledSequences().size() + " layouts: " + layoutManager.getEnabledSequences());
         stateStartTime = System.currentTimeMillis();
     }
 
@@ -79,7 +65,7 @@ public class CoxScoutScript extends AbstractScript implements ChatListener {
             case SKIP_DIALOG:
                 return handleSkipDialog();
             case READ_CHAT:
-                return handleReadChat();
+                return handleDetectLayout();
             case MATCH_LAYOUT:
                 return handleMatchLayout();
             default:
@@ -87,40 +73,64 @@ public class CoxScoutScript extends AbstractScript implements ChatListener {
         }
     }
 
+    /**
+     * Left-click at current mouse position (no movement).
+     */
     private int handleClickSteps() {
-        layoutDetectedThisCycle = false;
         lastDetectedLayout = "";
 
-        // Left-click at the locked mouse position (already on Steps)
-        // Mouse does NOT move — we click exactly where it is
-        Mouse.click(new Point(mouseX, mouseY));
-        log("Clicked Steps at (" + mouseX + ", " + mouseY + ") — attempt #" + (attempts + 1));
+        Mouse.click();
+        log("[CLICK_STEPS] Clicked in place — attempt #" + (attempts + 1));
         setState(ScoutState.SKIP_DIALOG);
         return Calculations.random(600, 1000);
     }
 
+    /**
+     * Press "1" to skip dialog. Timeout moves to layout detection.
+     */
     private int handleSkipDialog() {
         if (Dialogues.inDialogue()) {
+            log("[SKIP_DIALOG] In dialogue, pressing 1...");
             Keyboard.typeKey(Key.ONE);
             return Calculations.random(300, 600);
         }
 
-        if (System.currentTimeMillis() - stateStartTime > DIALOG_TIMEOUT) {
-            setState(ScoutState.READ_CHAT);
+        long elapsed = System.currentTimeMillis() - stateStartTime;
+        if (elapsed > DIALOG_TIMEOUT) {
+            log("[SKIP_DIALOG] Timeout after " + elapsed + "ms, detecting layout...");
+            setState(ScoutState.READ_CHAT); // Reusing READ_CHAT state for layout detection
             return Calculations.random(200, 400);
         }
 
         return Calculations.random(200, 400);
     }
 
-    private int handleReadChat() {
-        if (layoutDetectedThisCycle) {
+    /**
+     * Detect layout from instance template chunks (replaces chat reading).
+     */
+    private int handleDetectLayout() {
+        String layout = RaidLayoutDetector.detectLayout();
+
+        if (!layout.isEmpty() && layout.length() >= 4) {
+            lastDetectedLayout = layout;
+            log("[DETECT] Layout detected from game state: " + layout);
+
+            // Log detailed info on first attempt for debugging
+            if (attempts == 0) {
+                log(RaidLayoutDetector.detectDetailedLayout());
+            }
+
             setState(ScoutState.MATCH_LAYOUT);
             return 100;
         }
 
-        if (System.currentTimeMillis() - stateStartTime > CHAT_READ_TIMEOUT) {
-            log("No layout detected in chat, retrying...");
+        long elapsed = System.currentTimeMillis() - stateStartTime;
+        if (elapsed > LAYOUT_DETECT_TIMEOUT) {
+            log("[DETECT] No layout detected after " + elapsed + "ms, retrying...");
+
+            // Log detailed chunk data for debugging
+            log(RaidLayoutDetector.detectDetailedLayout());
+
             setState(ScoutState.CLICK_STEPS);
             return Calculations.random(500, 1000);
         }
@@ -128,18 +138,24 @@ public class CoxScoutScript extends AbstractScript implements ChatListener {
         return Calculations.random(200, 400);
     }
 
+    /**
+     * Check if detected layout matches any desired sequence.
+     */
     private int handleMatchLayout() {
         attempts++;
 
         if (layoutManager.matches(lastDetectedLayout)) {
             matchedLayout = lastDetectedLayout;
             log("*** MATCH FOUND: " + matchedLayout + " after " + attempts + " attempts! ***");
-            onLayoutFound();
+            Toolkit.getDefaultToolkit().beep();
+            if (gui != null) {
+                gui.onLayoutFound(matchedLayout, attempts);
+            }
             state = ScoutState.FOUND;
             return -1;
         }
 
-        log("Layout " + lastDetectedLayout + " does not match. Reloading... (" + attempts + " attempts)");
+        log("[MATCH] " + lastDetectedLayout + " — no match. (" + attempts + " attempts)");
         if (gui != null) {
             gui.updateStatus(attempts, lastDetectedLayout);
         }
@@ -147,35 +163,8 @@ public class CoxScoutScript extends AbstractScript implements ChatListener {
         return Calculations.random(300, 700);
     }
 
-    private void onLayoutFound() {
-        Toolkit.getDefaultToolkit().beep();
-        if (gui != null) {
-            gui.onLayoutFound(matchedLayout, attempts);
-        }
-    }
-
-    @Override
-    public void onGameMessage(Message message) {
-        if (message == null || message.getMessage() == null) {
-            return;
-        }
-
-        String text = message.getMessage();
-        Matcher matcher = LAYOUT_PATTERN.matcher(text);
-        if (matcher.find()) {
-            lastDetectedLayout = matcher.group(1);
-            layoutDetectedThisCycle = true;
-            log("Detected layout in chat: " + lastDetectedLayout);
-        }
-    }
-
-    @Override
-    public void onPlayerMessage(Message message) {}
-
-    @Override
-    public void onTradeMessage(Message message) {}
-
     private void setState(ScoutState newState) {
+        log("[STATE] " + state + " -> " + newState);
         this.state = newState;
         this.stateStartTime = System.currentTimeMillis();
     }
